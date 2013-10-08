@@ -1,0 +1,19 @@
+%if session.has_key("error"):
+${session.get_flashes('error')[0][0]}
+%endif
+<html>
+<body>
+<div>
+		
+		<form action="/" method="post">
+		    <div>Login</div>
+			<div>Email<input type="text" name="email" id="username"></div>
+			<div>Password<input type="password"  name="password" id="password"></div>
+			Date Of Birth: <input type = "text" name = "dob" />
+			<div><button>Login</button>
+			</div>
+		</form>
+	</div>
+</div>
+</body>
+</html>

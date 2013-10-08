@@ -1,0 +1,153 @@
+import datetime
+import logging as log
+from google.appengine.ext import db
+from formencode import validators
+from datetime import datetime
+from models.user import User
+from models.schedule import NFLSchedule  
+from pytz import timezone
+
+#Timezone is in EST, converting to PDT
+
+def tzone(d):
+	est = timezone('US/Eastern')
+	pdt = timezone('US/Pacific')
+	e = est.localize(d)
+	p = e.astimezone(pdt)
+	return p.strftime('%B %d %Y %I:%M %p') 
+
+def teamslist():
+	record = db.GqlQuery("SELECT visiting_team,home_team from NFLSchedule")
+	d = []
+	for r in record.run():
+		d.append(r.visiting_team)
+		d.append(r.home_team)
+
+	d = list(set(d))
+	log.info(d)
+	
+	return d 
+
+class Favorites(db.Model):
+	league_name = db.StringProperty()
+	team_name =  db.StringProperty()
+	user = db.ReferenceProperty(User)
+
+
+	@classmethod
+	def addfavorites(cls,request,data):
+		u = data['user_id']
+		try:
+			user = User.get(u)
+			res = []
+			league_name = data['league_name']
+			query = cls.gql("where user = :1",user).run()
+			favorites = [i.team_name for i in query]
+			teams = data['teams']
+			tlist = teamslist()
+			if league_name == "NFL":
+				for team in teams:
+					if team not in favorites:
+						if team in tlist:
+ 							data = cls(league_name = league_name, team_name = team, user = user)
+							data.put()
+							resp = {"team_name":team,"message":"Team successfully added to favorites."}
+							res.append(resp)
+						else:
+							resp = {"team_name":team,"message":"Team does not exist"}
+							res.append(resp)
+					else:
+						resp = {"team_name":team,"message":"Team already added to favorites."}
+						res.append(resp)
+				resp = {"response":res}
+				return resp 
+			else:
+				resp = {"status":False,"message":"League name is not NFL"}
+				return resp
+		except Exception as e:
+			log.info(e)
+			resp = {"status":False,"message":"Error occured adding team.  Please try again!"}
+			return resp
+
+	@classmethod
+	def favoriteschedules(cls,request,data):
+		u = data['user_id']
+		try:
+			dat = []
+			if data['schedule'] == "favorites":
+				user = User.get(u)
+				records = Favorites.all().filter("user = ",user.key())
+				log.info(records)
+				for r in records:
+					q = NFLSchedule.gql("where visiting_team = :1",r.team_name).run()
+					w = NFLSchedule.gql("where home_team = :1",r.team_name).run()
+					for re in q:
+						d = {}
+						k = re.key()
+						d['match_id'] = str(k)
+						d['week'] = int(re.week)
+						d['day'] = re.day
+						d['date'] = str(tzone(re.date)) 
+						d['year'] = int(re.year)
+						d['visiting_team'] = re.visiting_team
+						d['home_team'] = re.home_team
+
+		   				dat.append(d)
+ 					
+					for re in w:
+						d = {}
+						k = re.key()
+						d['match_id'] = str(k)
+						d['week'] = int(re.week)
+						d['day'] = re.day
+						d['date'] = str(tzone(re.date)) 
+						d['year'] = int(re.year)
+						d['visiting_team'] = re.visiting_team
+						d['home_team'] = re.home_team
+
+		   				dat.append(d)
+
+			elif data['schedule'] == "all":
+				q = NFLSchedule.all()
+				for re in q:
+					d = {}
+					k = re.key()
+					d['match_id'] = str(k)
+					d['week'] = int(re.week)
+					d['day'] = re.day
+					d['date'] = str(tzone(re.date)) 
+					d['year'] = int(re.year)
+					d['visiting_team'] = re.visiting_team
+					d['home_team'] = re.home_team
+
+		   			dat.append(d)
+			
+			resp = {"status":True,"data":dat}
+			return resp
+			   
+		except Exception as e:
+			resp = {"status":False,"message":e}
+			return resp
+
+
+	@classmethod
+	def viewfavorites(cls,request,data):
+		u = data['user_id']
+		try:
+			user = User.get(u)
+			records = Favorites.all().filter("user = ",user.key())
+			data = []
+			for r in records:
+				data.append(r.team_name)
+				resp = {"status":True,"Favorite Teams":data}
+			return resp
+		except Exception as e:
+			resp = {"status":False,"message":e}
+			return resp 
+
+	@classmethod
+	def uncheckfavorites(cls,request,data):
+
+
+		
+
